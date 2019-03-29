@@ -28,17 +28,22 @@
 
 provider "aws" {}
 
+locals {
+  cluster_name = "${var.name_prefix != "" ? "${var.name_prefix}-${var.cluster_name}" : var.cluster_name}"
+}
+
 resource "tls_private_key" "selfsigned" {
   algorithm   = "ECDSA"
   ecdsa_curve = "P384"
 }
 
 resource "tls_self_signed_cert" "selfsigned" {
+  count           = "${var.disable ? 0 : 1}"
   key_algorithm   = "ECDSA"
   private_key_pem = "${tls_private_key.selfsigned.private_key_pem}"
 
   subject {
-    common_name  = "${aws_lb.loadbalancer.dns_name}"
+    common_name  = "${element(aws_lb.loadbalancer.*.dns_name,0)}"
     organization = "Mesosphere Inc."
   }
 
@@ -52,9 +57,10 @@ resource "tls_self_signed_cert" "selfsigned" {
 }
 
 resource "aws_iam_server_certificate" "selfsigned" {
-  name             = "${format(var.elb_name_format,var.cluster_name)}-cert"
-  certificate_body = "${tls_self_signed_cert.selfsigned.cert_pem}"
-  private_key      = "${tls_private_key.selfsigned.private_key_pem}"
+  count            = "${var.disable ? 0 : 1}"
+  name             = "${format(var.elb_name_format,local.cluster_name)}-cert"
+  certificate_body = "${element(tls_self_signed_cert.selfsigned.*.cert_pem,0)}"
+  private_key      = "${element(tls_private_key.selfsigned.*.private_key_pem,0)}"
 }
 
 data "aws_subnet" "selected" {
@@ -63,7 +69,7 @@ data "aws_subnet" "selected" {
 
 // Only 32 characters allowed for name. So we have to use substring
 locals {
-  elb_name = "${format(var.elb_name_format,var.cluster_name)}"
+  elb_name = "${format(var.elb_name_format,local.cluster_name)}"
 
   default_listeners = [
     {
@@ -78,10 +84,11 @@ locals {
   ]
 
   concat_listeners = ["${coalescelist(var.listener, concat(local.default_listeners,var.additional_listener))}"]
-  instances        = ["${var.instances}"]
+  instances        = ["${coalescelist(var.instances, list(""))}"]
 }
 
 resource "aws_lb" "loadbalancer" {
+  count                            = "${var.disable ? 0 : 1}"
   name                             = "${substr(local.elb_name,0, length(local.elb_name) >= 32 ? 32 : length(local.elb_name) )}"
   internal                         = "${var.internal}"
   load_balancer_type               = "${var.load_balancer_type}"
@@ -91,17 +98,17 @@ resource "aws_lb" "loadbalancer" {
   # security_groups = ["${ var.load_balancer_type == "application" ? var.security_groups : list()}"]
 
   security_groups = ["${compact(split(",", var.load_balancer_type == "application" ? join(",", var.security_groups) : ""))}"]
-  tags            = "${merge(var.tags, map("Name", format(var.elb_name_format,var.cluster_name),
+  tags            = "${merge(var.tags, map("Name", format(var.elb_name_format,local.cluster_name),
                                 "Cluster", var.cluster_name))}"
 }
 
 resource "aws_lb_listener" "listeners" {
-  count             = "${length(local.concat_listeners)}"
-  load_balancer_arn = "${aws_lb.loadbalancer.arn}"
+  count             = "${var.disable ? 0 : length(local.concat_listeners)}"
+  load_balancer_arn = "${element(aws_lb.loadbalancer.*.arn,0)}"
   port              = "${lookup(local.concat_listeners[count.index], "port")}"
   protocol          = "${upper(lookup(local.concat_listeners[count.index], "protocol", var.load_balancer_type == "application" ? "http" : "tcp"))}"
 
-  certificate_arn = "${lookup(local.concat_listeners[count.index], "certificate_arn", "") == "selfsigned" ? aws_iam_server_certificate.selfsigned.arn : lookup(local.concat_listeners[count.index], "certificate_arn", "")}"
+  certificate_arn = "${lookup(local.concat_listeners[count.index], "certificate_arn", "") == "selfsigned" ? aws_iam_server_certificate.selfsigned.0.arn : lookup(local.concat_listeners[count.index], "certificate_arn", "")}"
 
   default_action {
     type             = "forward"
@@ -110,7 +117,7 @@ resource "aws_lb_listener" "listeners" {
 }
 
 resource "aws_lb_target_group" "targetgroup" {
-  count    = "${length(local.concat_listeners)}"
+  count    = "${var.disable ? 0 : length(local.concat_listeners)}"
   port     = "${lookup(local.concat_listeners[count.index], "port")}"
   protocol = "${upper(lookup(local.concat_listeners[count.index], "protocol", var.load_balancer_type == "application" ? "http" : "tcp"))}"
   name     = "${local.elb_name}-tg-${lookup(local.concat_listeners[count.index], "port")}"
@@ -122,14 +129,14 @@ resource "aws_lb_target_group" "targetgroup" {
   }
 
   health_check {
-    protocol = "${upper(lookup(local.concat_listeners[ceil(count.index / length(var.instances))], "protocol", var.load_balancer_type == "application" ? "http" : "tcp"))}"
-    port     = "${lookup(local.concat_listeners[ceil(count.index / length(var.instances))], "port")}"
+    protocol = "${upper(lookup(local.concat_listeners[ceil(count.index / length(local.instances))], "protocol", var.load_balancer_type == "application" ? "http" : "tcp"))}"
+    port     = "${lookup(local.concat_listeners[ceil(count.index / length(local.instances))], "port")}"
   }
 }
 
 resource "aws_lb_target_group_attachment" "attachment" {
-  count            = "${var.num_instances * length(local.concat_listeners)}"
-  target_group_arn = "${element(aws_lb_target_group.targetgroup.*.arn, ceil(count.index / length(var.instances)))}"
+  count            = "${var.disable ? 0 : var.num_instances * length(local.concat_listeners)}"
+  target_group_arn = "${element(aws_lb_target_group.targetgroup.*.arn, ceil(count.index / length(local.instances)))}"
   target_id        = "${element(var.instances, count.index)}"
-  port             = "${lookup(local.concat_listeners[ceil(count.index / length(var.instances))], "port")}"
+  port             = "${lookup(local.concat_listeners[ceil(count.index / length(local.instances))], "port")}"
 }

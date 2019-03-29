@@ -39,6 +39,16 @@ variable "listener" {
   default     = []
 }
 
+variable "disable" {
+  description = "Do not create load balancer and its resources"
+  default     = false
+}
+
+variable "name_prefix" {
+  description = "Name Prefix"
+  default     = ""
+}
+
 variable "additional_listener" {
   description = "List of additional listeners"
   default     = []
