@@ -98,8 +98,7 @@ resource "aws_lb" "loadbalancer" {
   # security_groups = ["${ var.load_balancer_type == "application" ? var.security_groups : list()}"]
 
   security_groups = ["${compact(split(",", var.load_balancer_type == "application" ? join(",", var.security_groups) : ""))}"]
-  tags            = "${merge(var.tags, map("Name", format(var.elb_name_format,local.cluster_name),
-                                "Cluster", var.cluster_name))}"
+  tags            = "${merge(var.tags, map("Name", format(var.elb_name_format,local.cluster_name), "Cluster", local.cluster_name))}"
 }
 
 resource "aws_lb_listener" "listeners" {
@@ -120,8 +119,10 @@ resource "aws_lb_target_group" "targetgroup" {
   count    = "${var.disable ? 0 : length(local.concat_listeners)}"
   port     = "${lookup(local.concat_listeners[count.index], "port")}"
   protocol = "${upper(lookup(local.concat_listeners[count.index], "protocol", var.load_balancer_type == "application" ? "http" : "tcp"))}"
-  name     = "${local.elb_name}-tg-${lookup(local.concat_listeners[count.index], "port")}"
-  vpc_id   = "${data.aws_subnet.selected.vpc_id}"
+  name     = "${substr(local.elb_name,0, length(local.elb_name) >= 24 ? 24 : length(local.elb_name) )}-tg-${lookup(local.concat_listeners[count.index], "port")}"
+  tags     = "${merge(var.tags, map("Name", format(var.elb_name_format,local.cluster_name), "Cluster", local.cluster_name))}"
+
+  vpc_id = "${data.aws_subnet.selected.vpc_id}"
 
   stickiness {
     type    = "lb_cookie"
