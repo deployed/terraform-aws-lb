@@ -28,21 +28,21 @@ module "dcos-masters-lb" {
 
 | Name | Description | Type | Default | Required |
 |------|-------------|:----:|:-----:|:-----:|
-| additional\_listener | List of additional listeners | list | `<list>` | no |
 | cluster\_name | Name of the DC/OS cluster | string | n/a | yes |
+| instances | List of instance IDs | list | n/a | yes |
+| num\_instances | How many instances should be created | string | n/a | yes |
+| subnet\_ids | List of subnet IDs created in this network | list | n/a | yes |
+| additional\_listener | List of additional listeners | list | `<list>` | no |
 | cross\_zone\_load\_balancing | Enable cross-zone load balancing | string | `"true"` | no |
 | disable | Do not create load balancer and its resources | string | `"false"` | no |
 | elb\_name\_format | Printf style format for naming the ELB. Gets truncated to 32 characters. (input cluster_name) | string | `"load-balancer-%s"` | no |
 | health\_check | Health check definition. | map | `<map>` | no |
 | https\_acm\_cert\_arn | ACM certifacte to be used. | string | `""` | no |
-| instances | List of instance IDs | list | n/a | yes |
 | internal | This ELB is internal only | string | `"false"` | no |
 | listener | List of listeners. By default HTTP and HTTPS are set. If set it overrides the default listeners. | list | `<list>` | no |
 | load\_balancer\_type | Load Balancer type. Allowed values network, application | string | `"network"` | no |
 | name\_prefix | Name Prefix | string | `""` | no |
-| num\_instances | How many instances should be created | string | n/a | yes |
 | security\_groups | Security Group IDs to use | list | `<list>` | no |
-| subnet\_ids | List of subnet IDs created in this network | list | n/a | yes |
 | tags | Add custom tags to all resources | map | `<map>` | no |
 
 ## Outputs
