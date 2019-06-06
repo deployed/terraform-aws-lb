@@ -132,8 +132,8 @@ resource "aws_lb_target_group" "targetgroup" {
   }
 
   health_check {
-    protocol = "${upper(lookup(local.concat_listeners[ceil(count.index / length(local.instances))], "protocol", var.load_balancer_type == "application" ? "http" : "tcp"))}"
-    port     = "${lookup(local.concat_listeners[ceil(count.index / length(local.instances))], "port")}"
+    protocol = "${upper(lookup(local.concat_listeners[count.index], "protocol", var.load_balancer_type == "application" ? "http" : "tcp"))}"
+    port     = "${lookup(local.concat_listeners[count.index], "port")}"
   }
 }
 
