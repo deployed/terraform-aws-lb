@@ -120,7 +120,7 @@ resource "aws_lb_target_group" "targetgroup" {
   count    = "${var.disable ? 0 : length(local.concat_listeners)}"
   port     = "${lookup(local.concat_listeners[count.index], "port")}"
   protocol = "${upper(lookup(local.concat_listeners[count.index], "protocol", var.load_balancer_type == "application" ? "http" : "tcp"))}"
-  name     = "${substr(local.elb_name,0, length(local.elb_name) >= 24 ? 24 : length(local.elb_name) )}-tg-${lookup(local.concat_listeners[count.index], "port")}"
+  name     = "${substr(local.elb_name,0, length(local.elb_name) >= 24 ? 23 : length(local.elb_name) )}-tg-${lookup(local.concat_listeners[count.index], "port")}"
   tags     = "${merge(var.tags, map("Name", format(var.elb_name_format,local.cluster_name),
                                     "Cluster", local.cluster_name) )}"
 
